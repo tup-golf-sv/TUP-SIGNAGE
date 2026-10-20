@@ -1,0 +1,27 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>T.UP 광고판 관리자</title><style>
+*{box-sizing:border-box}body{margin:0;background:#060c08;color:#f6fff2;font-family:Arial,'Malgun Gothic',sans-serif}main{max-width:540px;margin:8vh auto;padding:28px;background:#122018;border:1px solid #385b2b;border-radius:18px}h1{color:#c8ff31;font-size:27px;margin:0 0 10px}p{line-height:1.55;color:#bed1b8}label{display:block;margin:20px 0 7px;font-weight:bold}input,textarea{width:100%;border:1px solid #607a58;border-radius:9px;background:#050905;color:white;padding:14px;font:inherit}textarea{min-height:170px;resize:vertical;line-height:1.6}button{border:0;background:#c8ff31;color:#10200a;padding:13px 19px;border-radius:9px;font-weight:bold;cursor:pointer;margin-top:15px}button.secondary{background:#314235;color:white;margin-left:8px}.hidden{display:none}#status{font-size:14px;min-height:22px;margin-top:15px;white-space:pre-wrap}small{color:#a9bca5}header{display:flex;justify-content:space-between;align-items:center;gap:12px}</style></head><body><main>
+<header><h1>T.UP SIGNAGE</h1><small>관리자 전용</small></header><p>TV 광고판의 회원 공지를 원격으로 수정합니다.</p>
+<section id="login"><label for="email">관리자 이메일</label><input id="email" type="email" autocomplete="username"><label for="password">비밀번호</label><input id="password" type="password" autocomplete="current-password"><button id="signin">로그인</button></section>
+<section id="editor" class="hidden"><p>현재 공지</p><label for="notice">회원 공지 내용</label><textarea id="notice" maxlength="2000"></textarea><button id="save">TV 공지 저장</button><button id="signout" class="secondary">로그아웃</button><p><small>저장 후 Firestore에 반영되며 연결된 TV에 자동 표시됩니다.</small></p></section>
+<div id="status" role="status"></div></main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script><script src="./firebase-config.js"></script><script>
+(function(){
+ const ADMIN_UID='eEnqgOuteeR3kvvGavk3zFqogHn1';const $=id=>document.getElementById(id);const status=t=>$('status').textContent=t;
+ const cfg=window.TUP_FIREBASE_CONFIG;
+ if(!cfg||!cfg.apiKey||cfg.apiKey.indexOf('입력')>=0||!cfg.appId){status('firebase-config.js에 Firebase 웹앱 설정값을 입력하세요.');return;}
+ try{firebase.initializeApp(cfg)}catch(e){status('Firebase 초기화 실패: '+e.message);return;}
+ const auth=firebase.auth(),doc=firebase.firestore().collection('signage').doc('config');let unsubscribe=null;
+ auth.onAuthStateChanged(async user=>{
+  if(unsubscribe){unsubscribe();unsubscribe=null;}
+  const allowed=!!user&&user.uid===ADMIN_UID;
+  $('login').classList.toggle('hidden',!!user);$('editor').classList.toggle('hidden',!allowed);
+  if(!user){status('관리자 계정으로 로그인하세요.');return;}
+  if(!allowed){status('등록된 관리자 UID가 아닙니다. 접근이 차단됩니다.');await auth.signOut();return;}
+  status('로그인 완료. 공지를 불러오는 중입니다.');
+  unsubscribe=doc.onSnapshot(s=>{if(s.exists&&typeof s.data().notice==='string')$('notice').value=s.data().notice;status('원격 공지 연결됨');},e=>status('공지 조회 실패: '+e.message));
+ });
+ $('signin').onclick=async()=>{try{status('로그인 중...');await auth.signInWithEmailAndPassword($('email').value.trim(),$('password').value)}catch(e){status('로그인 실패: '+e.message)}};
+ $('save').onclick=async()=>{try{const user=auth.currentUser;if(!user||user.uid!==ADMIN_UID)throw Error('관리자 인증이 필요합니다.');status('저장 중...');await doc.set({notice:$('notice').value},{merge:true});status('저장 완료. TV에 자동 반영됩니다.')}catch(e){status('저장 실패: '+e.message)}};
+ $('signout').onclick=()=>auth.signOut();
+})();
+</script></body></html>
